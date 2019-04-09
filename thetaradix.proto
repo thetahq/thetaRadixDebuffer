@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package thetaradix;
+
+service ThetaRadix {
+    rpc Register (RegisterRequest) returns (RegisterReply);
+}
+
+message RegisterRequest {
+    string mail = 1;
+    string password = 2;
+}
+
+message RegisterReply {
+    bool success = 1;
+    bool pleaseVerifyPassword = 2;
+    string jwt = 3;
+    string errorMessage = 4;
+}
