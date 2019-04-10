@@ -8,6 +8,7 @@ service ThetaRadix {
 
 message RegisterRequest {
     string mail = 1;
+    string nickname = 3;
     string password = 2;
 }
 

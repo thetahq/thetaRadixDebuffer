@@ -1,4 +1,4 @@
-module thetaRadixDebuffer
+module github.com/thetahq/thetaRadixDebuffer
 
 go 1.12
 
