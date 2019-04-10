@@ -3,9 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"github.com/thetahq/thetaRadixDebuffer/thetaradix"
 	"google.golang.org/grpc"
 	"io/ioutil"
@@ -39,6 +37,43 @@ type DebufferServer struct {
 	cfg Config
 }
 
+func (d DebufferServer) Login(ctx context.Context, request *thetaradix.LoginRequest) (*thetaradix.LoginReply, error) {
+	log.Println("Login request")
+
+	req, err := http.Post(d.cfg.ServerAddress, "application/json", nil)
+	authHeader, err := generateAuthHeader(request.Mail, request.Password)
+	if err != nil {
+		log.Println("Failed to generate auth header", err) // TODO: Deduplicate code
+		return nil, err
+	}
+	req.Header.Set("Authorization", authHeader)
+
+	// TODO: Deduplicate code
+	responseData := make(map[string]interface{})
+	responseBytes, err := ioutil.ReadAll(req.Body)
+	if err != nil {
+		log.Println("Failed to read response", err)
+		return nil, err
+	}
+
+	err = json.Unmarshal(responseBytes, responseData)
+	if err != nil {
+		log.Println("Failed to unmarchal json", err)
+		return nil, err
+	}
+
+	isSuccess, err := successToBool(responseData["status"].(string))
+	if err != nil {
+		log.Println("Failed to parse status", err)
+		return nil, err
+	}
+
+	return &thetaradix.LoginReply{
+		Success: isSuccess,
+		Jwt:     responseData["message"].(string), // TODO: Message is not token when isSuccess==false
+	}, nil
+}
+
 func (d DebufferServer) Register(ctx context.Context, request *thetaradix.RegisterRequest) (*thetaradix.RegisterReply, error) {
 	log.Println("Register request")
 
@@ -49,26 +84,20 @@ func (d DebufferServer) Register(ctx context.Context, request *thetaradix.Regist
 
 	req, err := http.Post(d.cfg.ServerAddress, "application/json", bytes.NewBuffer(jsonBody))
 	if err != nil {
-		log.Println("Failed to send post request")
+		log.Println("Failed to send post request", err)
 		return nil, err
 	}
-	authorizationString := fmt.Sprintf("%s:%s:%s", request.Mail, request.Password, request.Password)
-	// Encode authorization string into base64
-	base64output := bytes.Buffer{}
-	base64Encoder := base64.NewEncoder(base64.StdEncoding, &base64output)
-	_, err = base64Encoder.Write([]byte(authorizationString))
-	err = base64Encoder.Close()
+	authorizationString, err := generateAuthHeader(request.Mail, request.Password)
 	if err != nil {
-		log.Println("Failed to encode authorization header")
+		log.Println("Failed to generate auth header", err)
 		return nil, err
 	}
-
-	req.Header.Set("Authorization", base64output.String())
+	req.Header.Set("Authorization", authorizationString)
 
 	responseData := make(map[string]interface{})
 	responseBytes, err := ioutil.ReadAll(req.Body)
 	if err != nil {
-		log.Println("Failed to read response")
+		log.Println("Failed to read response", err)
 		return nil, err
 	}
 
