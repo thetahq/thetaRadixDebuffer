@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/thetahq/thetaRadixDebuffer/thetaradix"
 	"google.golang.org/grpc"
+	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -39,6 +40,8 @@ type DebufferServer struct {
 }
 
 func (d DebufferServer) Register(ctx context.Context, request *thetaradix.RegisterRequest) (*thetaradix.RegisterReply, error) {
+	log.Println("Register request")
+
 	bodyData := make(map[string]interface{})
 	bodyData["username"] = request.Nickname
 	bodyData["terms"] = true
@@ -57,9 +60,33 @@ func (d DebufferServer) Register(ctx context.Context, request *thetaradix.Regist
 	err = base64Encoder.Close()
 	if err != nil {
 		log.Println("Failed to encode authorization header")
+		return nil, err
 	}
 
 	req.Header.Set("Authorization", base64output.String())
 
-	return &thetaradix.RegisterReply{}, nil
+	responseData := make(map[string]interface{})
+	responseBytes, err := ioutil.ReadAll(req.Body)
+	if err != nil {
+		log.Println("Failed to read response")
+		return nil, err
+	}
+
+	err = json.Unmarshal(responseBytes, responseData)
+	if err != nil {
+		log.Println("Failed to unmarchal json", err)
+		return nil, err
+	}
+
+	isSuccess, err := successToBool(responseData["status"].(string))
+	if err != nil {
+		log.Println("Failed to parse status", err)
+		return nil, err
+	}
+
+	return &thetaradix.RegisterReply{
+		Success:              isSuccess,
+		PleaseVerifyPassword: true,
+		ErrorMessage:         responseData["message"].(string),
+	}, nil
 }

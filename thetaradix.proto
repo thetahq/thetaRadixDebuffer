@@ -15,6 +15,6 @@ message RegisterRequest {
 message RegisterReply {
     bool success = 1;
     bool pleaseVerifyPassword = 2;
-    string jwt = 3;
     string errorMessage = 4;
+    reserved 3; // Do not remove, used for backwards compatibility
 }
