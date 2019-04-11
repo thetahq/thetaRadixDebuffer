@@ -71,6 +71,7 @@ func (d DebufferServer) Login(ctx context.Context, request *thetaradix.LoginRequ
 	return &thetaradix.LoginReply{
 		Success: isSuccess,
 		Jwt:     responseData["message"].(string), // TODO: Message is not token when isSuccess==false
+		Message: responseData["message"].(string), // !Same as above
 	}, nil
 }
 
