@@ -1,12 +1,13 @@
 package main
 
+import "C"
 import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"github.com/pkg/errors"
 	"github.com/thetahq/thetaRadixDebuffer/thetaradix"
 	"google.golang.org/grpc"
-	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -48,18 +49,10 @@ func (d DebufferServer) Login(ctx context.Context, request *thetaradix.LoginRequ
 	}
 	req.Header.Set("Authorization", authHeader)
 
-	// TODO: Deduplicate code
-	responseData := make(map[string]interface{})
-	responseBytes, err := ioutil.ReadAll(req.Body)
+	responseData, err := readJSONFromBody(req.Body)
 	if err != nil {
-		log.Println("Failed to read response", err)
-		return nil, err
-	}
-
-	err = json.Unmarshal(responseBytes, responseData)
-	if err != nil {
-		log.Println("Failed to unmarchal json", err)
-		return nil, err
+		logError(err)
+		return &thetaradix.LoginReply{}, errors.Wrap(err, "failed to read json from body")
 	}
 
 	isSuccess, err := successToBool(responseData["status"].(string))
@@ -68,10 +61,17 @@ func (d DebufferServer) Login(ctx context.Context, request *thetaradix.LoginRequ
 		return nil, err
 	}
 
+	jwt := ""
+	msg := responseData["message"].(string)
+	if isSuccess {
+		jwt = responseData["message"].(string)
+		msg = ""
+	}
+
 	return &thetaradix.LoginReply{
 		Success: isSuccess,
-		Jwt:     responseData["message"].(string), // TODO: Message is not token when isSuccess==false
-		Message: responseData["message"].(string), // !Same as above
+		Jwt:     jwt,
+		Message: msg,
 	}, nil
 }
 
@@ -88,6 +88,7 @@ func (d DebufferServer) Register(ctx context.Context, request *thetaradix.Regist
 		log.Println("Failed to send post request", err)
 		return nil, err
 	}
+
 	authorizationString, err := generateAuthHeader(request.Mail, request.Password)
 	if err != nil {
 		log.Println("Failed to generate auth header", err)
@@ -95,17 +96,10 @@ func (d DebufferServer) Register(ctx context.Context, request *thetaradix.Regist
 	}
 	req.Header.Set("Authorization", authorizationString)
 
-	responseData := make(map[string]interface{})
-	responseBytes, err := ioutil.ReadAll(req.Body)
+	responseData, err := readJSONFromBody(req.Body)
 	if err != nil {
-		log.Println("Failed to read response", err)
-		return nil, err
-	}
-
-	err = json.Unmarshal(responseBytes, responseData)
-	if err != nil {
-		log.Println("Failed to unmarchal json", err)
-		return nil, err
+		logError(err)
+		return &thetaradix.RegisterReply{}, errors.Wrap(err, "failed to read json from body")
 	}
 
 	isSuccess, err := successToBool(responseData["status"].(string))
